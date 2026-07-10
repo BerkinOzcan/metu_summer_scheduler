@@ -22,9 +22,10 @@
         .class-block { position: absolute; left: 2px; right: 2px; border-radius: 4px; color: white; padding: 4px; font-size: 0.7rem; overflow: hidden; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         
         /* Footer Stili */
-        .custom-footer { position: fixed; bottom: 5px; right: 10px; font-size: 10px; color: #adb5bd; text-align: right; pointer-events: none; }
-        .custom-footer a { color: #6c757d; text-decoration: none; pointer-events: auto; }
+        .custom-footer { position: fixed; bottom: 5px; right: 10px; font-size: 14px; color: #495057; text-align: right; pointer-events: none; background: rgba(255,255,255,0.95); padding: 8px 12px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .custom-footer a, .custom-footer .footer-label { color: #495057; text-decoration: none; pointer-events: auto; display: inline-flex; align-items: center; gap: 6px; font-size: inherit; font-weight: 600; }
         .custom-footer a:hover { color: #0d6efd; }
+        .custom-footer svg { width: 16px; height: 16px; fill: currentColor; }
     </style>
 </head>
 <body>
@@ -80,8 +81,19 @@
 
 <!-- Footer -->
 <div class="custom-footer">
-    Ha bu kod açık kaynaktur: <a href="https://github.com/BerkinOzcan/metu_summer_scheduler" target="_blank">GitHub</a> | 
-    <a href="https://www.linkedin.com/in/ozcanberkin/" target="_blank">LinkedIn</a>
+    <span class="footer-label">Ha bu kod açık kaynaktur:</span>
+    <a href="https://github.com/BerkinOzcan/metu_summer_scheduler" target="_blank" rel="noreferrer">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.52 7.52 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path>
+        </svg>
+        GitHub
+    </a> |
+    <a href="https://www.linkedin.com/in/ozcanberkin/" target="_blank" rel="noreferrer">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M1.15 2.35A1.16 1.16 0 1 1 1.15.03a1.16 1.16 0 0 1 0 2.32ZM.13 5.33h2.04V16H.13V5.33Zm5.05 0h1.96v1.46h.03c.27-.52.94-1.06 1.93-1.06 2.06 0 2.44 1.36 2.44 3.13V16H9.5V9.63c0-1.52-.03-3.48-2.12-3.48-2.12 0-2.45 1.66-2.45 3.37V16H2.89V5.33h2.29Z"></path>
+        </svg>
+        LinkedIn
+    </a>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
