@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ODTÜ Yaz Okulu Program Yapıcı</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    
+    <style>
+        body { background-color: #f8f9fa; padding-bottom: 70px; } /* Footer için boşluk */
+        .course-card { margin-bottom: 15px; border-left: 5px solid #0d6efd; background: white; }
+        summary { cursor: pointer; padding: 10px; font-weight: bold; list-style: none; user-select: none; display: flex; align-items: center; }
+        summary::after { content: '▾'; margin-left: auto; }
+        details[open] summary::after { content: '▴'; }
+        
+        .schedule-grid { display: grid; grid-template-columns: 60px repeat(5, 1fr); grid-template-rows: 30px repeat(12, 40px); border-top: 1px solid #dee2e6; border-left: 1px solid #dee2e6; background-color: #fff; }
+        .grid-header { background-color: #343a40; color: white; text-align: center; font-weight: bold; padding: 5px; border-right: 1px solid #dee2e6; border-bottom: 1px solid #dee2e6; }
+        .grid-time { background-color: #e9ecef; text-align: center; font-size: 0.7rem; display: flex; align-items: center; justify-content: center; border-right: 1px solid #dee2e6; border-bottom: 1px solid #dee2e6; }
+        .grid-cell { border-right: 1px solid #dee2e6; border-bottom: 1px solid #dee2e6; }
+        .class-block-wrapper { position: relative; width: 100%; height: 0; }
+        .class-block { position: absolute; left: 2px; right: 2px; border-radius: 4px; color: white; padding: 4px; font-size: 0.7rem; overflow: hidden; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        
+        /* Footer Stili */
+        .custom-footer { position: fixed; bottom: 5px; right: 10px; font-size: 10px; color: #adb5bd; text-align: right; pointer-events: none; }
+        .custom-footer a { color: #6c757d; text-decoration: none; pointer-events: auto; }
+        .custom-footer a:hover { color: #0d6efd; }
+    </style>
+</head>
+<body>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>☻ ODTÜ Yaz Okulu Ders Programı - Kombinasyonlama</h2>
+        <button class="btn btn-outline-danger btn-sm" onclick="clearStorage()">Tümünü Sil</button>
+    </div>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title">1. Ders Ekle</h5>
+            <div class="input-group">
+                <input type="text" id="courseInput" class="form-control" placeholder="Ders Kodu">
+                <button class="btn btn-primary" onclick="addCourse()">Dersi Ekle</button>
+            </div>
+        </div>
+    </div>
+
+    <h5 class="mb-3">2. Ders Detayları</h5>
+    <div id="courseContainer"></div>
+
+    <div class="card mb-4 mt-4 shadow-sm border-primary">
+        <div class="card-body text-center">
+            <div class="mb-3">
+                <div class="form-check form-switch d-inline-block me-4">
+                    <input class="form-check-input" type="checkbox" id="conflictToggle" checked onchange="saveData()">
+                    <label class="form-check-label" for="conflictToggle">Çakışma Kontrolü</label>
+                </div>
+            </div>
+            <button class="btn btn-success btn-lg mx-2" onclick="generateFromToggle()">Seçili Olanlarla Hesapla</button>
+            <button class="btn btn-warning btn-lg mx-2" onclick="generateAllSubsets()">Tüm Ders Olasılıklarını Hesapla</button>
+        </div>
+    </div>
+
+    <div id="resultsArea" style="display: none;">
+        <div class="alert alert-info" id="resultCount"></div>
+        <div class="d-flex align-items-center justify-content-center mb-3">
+            <select id="filterSelector" class="form-select mx-2" style="max-width: 200px;" onchange="applyFilter()">
+                <option value="all">Tüm Ders Sayıları</option>
+            </select>
+            <button class="btn btn-primary mx-1" id="prevBtn" onclick="prevCombo()">&laquo; Önceki</button>
+            <select id="comboSelector" class="form-select mx-1 fw-bold text-center" style="max-width: 300px;" onchange="renderSchedule()"></select>
+            <button class="btn btn-primary mx-1" id="nextBtn" onclick="nextCombo()">Sonraki &raquo;</button>
+        </div>
+        <div class="row">
+            <div class="col-md-8"><div class="card shadow-sm mb-5"><div class="card-body p-0"><div class="schedule-grid" id="scheduleGrid"></div></div></div></div>
+            <div class="col-md-4"><div class="card shadow-sm"><div class="card-header bg-dark text-white">Alınan Dersler</div><ul class="list-group list-group-flush" id="sectionList"></ul></div></div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<div class="custom-footer">
+    Ha bu kod açık kaynaktur: <a href="https://github.com/BerkinOzcan/metu_summer_scheduler" target="_blank">GitHub</a> | 
+    <a href="https://www.linkedin.com/in/ozcanberkin/" target="_blank">LinkedIn</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+    let courses = {};
+    const colors = ['#0d6efd', '#198754', '#dc3545', '#fd7e14', '#6f42c1', '#20c997', '#0dcaf0'];
+    let allGeneratedCombos = [];
+    let filteredCombos = [];
+
+    function loadData() { const d = localStorage.getItem('odtuSchedulerData'); if(d) courses = JSON.parse(d); renderCourses(); }
+    function saveData() { localStorage.setItem('odtuSchedulerData', JSON.stringify(courses)); }
+    function clearStorage() { if(confirm("Tümünü sil?")) { localStorage.removeItem('odtuSchedulerData'); courses = {}; renderCourses(); document.getElementById('resultsArea').style.display = 'none'; } }
+    
+    function addCourse() {
+        const input = document.getElementById('courseInput');
+        const name = input.value.trim().toUpperCase();
+        if (!name || courses[name]) return;
+        courses[name] = { active: true, rows: [] };
+        input.value = '';
+        saveData();
+        renderCourses();
+    }
+
+    function renameCourse(oldName, newName) {
+        const cleanName = newName.trim().toUpperCase();
+        if (cleanName === "" || cleanName === oldName) return;
+        if (courses[cleanName]) { alert("Bu isimde bir ders var!"); renderCourses(); return; }
+        courses[cleanName] = courses[oldName];
+        delete courses[oldName];
+        saveData();
+        renderCourses();
+    }
+
+    function renderCourses() {
+        const container = document.getElementById('courseContainer');
+        container.innerHTML = '';
+        for (const [name, data] of Object.entries(courses)) {
+            const details = document.createElement('details');
+            details.className = 'card course-card';
+            details.open = true;
+            details.innerHTML = `
+                <summary>
+                    <input class="form-check-input me-2" type="checkbox" ${data.active ? 'checked' : ''} onchange="toggleCourse('${name}', this.checked)">
+                    <input type="text" class="form-control form-control-sm mx-2" style="max-width: 200px;" value="${name}" onblur="renameCourse('${name}', this.value)" onclick="event.stopPropagation()">
+                    <button class="btn btn-sm btn-outline-danger ms-auto" onclick="deleteCourse('${name}')">Sil</button>
+                </summary>
+                <div class="card-body"><table class="table table-sm"><thead><tr><th>Sec</th><th>Gün</th><th>Baş</th><th>Bit</th><th></th></tr></thead><tbody id="tbody-${name}"></tbody></table><button class="btn btn-sm btn-secondary" onclick="addRow('${name}')">+ Saat Ekle</button></div>
+            `;
+            container.appendChild(details);
+            data.rows.forEach((row, index) => renderRow(name, row, index));
+            if(data.rows.length === 0) addRow(name);
+        }
+        flatpickr(".time-picker", { enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true });
+    }
+
+    function toggleCourse(name, active) { courses[name].active = active; saveData(); }
+    function deleteCourse(name) { event.stopPropagation(); delete courses[name]; saveData(); renderCourses(); }
+    function addRow(name) { courses[name].rows.push({ section: '1', day: 'Pazartesi', start: '08:40', end: '10:30' }); saveData(); renderCourses(); }
+    function removeRow(name, idx) { courses[name].rows.splice(idx, 1); saveData(); renderCourses(); }
+    function updateRow(name, idx, field, val) { courses[name].rows[idx][field] = val; saveData(); }
+
+    function renderRow(name, row, idx) {
+        const tbody = document.getElementById(`tbody-${name}`);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" class="form-control form-control-sm" value="${row.section}" onchange="updateRow('${name}', ${idx}, 'section', this.value)"></td>
+            <td><select class="form-select form-select-sm" onchange="updateRow('${name}', ${idx}, 'day', this.value)">${['Pazartesi','Salı','Çarşamba','Perşembe','Cuma'].map(d=>`<option ${row.day==d?'selected':''}>${d}</option>`).join('')}</select></td>
+            <td><input type="text" class="form-control form-control-sm time-picker bg-white" value="${row.start}" onchange="updateRow('${name}', ${idx}, 'start', this.value)"></td>
+            <td><input type="text" class="form-control form-control-sm time-picker bg-white" value="${row.end}" onchange="updateRow('${name}', ${idx}, 'end', this.value)"></td>
+            <td><button class="btn btn-sm btn-danger" onclick="removeRow('${name}', ${idx})">Sil</button></td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    function timeToMin(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
+
+    function calculate(courseList) {
+        const checkConflicts = document.getElementById('conflictToggle').checked;
+        let courseSections = {};
+        for (let c of courseList) {
+            let rows = courses[c].rows.filter(r => r.section && r.start && r.end);
+            if (rows.length === 0) return [];
+            let sections = {};
+            rows.forEach(r => { if(!sections[r.section]) sections[r.section] = []; sections[r.section].push(r); });
+            courseSections[c] = sections;
+        }
+        let combinations = [[]];
+        for (let c of courseList) {
+            let temp = [];
+            for (let combo of combinations) {
+                for (let sec of Object.keys(courseSections[c])) {
+                    temp.push([...combo, { course: c, section: sec, blocks: courseSections[c][sec] }]);
+                }
+            }
+            combinations = temp;
+        }
+        return combinations.filter(combo => {
+            if (!checkConflicts) return true;
+            let flatBlocks = [];
+            combo.forEach(item => item.blocks.forEach(b => flatBlocks.push({...b, day: b.day, start: timeToMin(b.start), end: timeToMin(b.end)})));
+            for (let i = 0; i < flatBlocks.length; i++) {
+                for (let j = i + 1; j < flatBlocks.length; j++) {
+                    if (flatBlocks[i].day === flatBlocks[j].day && Math.max(flatBlocks[i].start, flatBlocks[j].start) < Math.min(flatBlocks[i].end, flatBlocks[j].end)) return false;
+                }
+            }
+            return true;
+        });
+    }
+
+    function generateFromToggle() { const active = Object.keys(courses).filter(c => courses[c].active); allGeneratedCombos = calculate(active); updateUI(); }
+    function generateAllSubsets() {
+        const allCourseNames = Object.keys(courses);
+        const subsets = allCourseNames.reduce((subsets, value) => subsets.concat(subsets.map(set => [value, ...set])), [[]]).filter(s => s.length > 0);
+        allGeneratedCombos = [];
+        subsets.forEach(subset => allGeneratedCombos = allGeneratedCombos.concat(calculate(subset)));
+        allGeneratedCombos.sort((a,b) => a.length - b.length);
+        updateUI();
+    }
+
+    function updateUI() {
+        const filterSel = document.getElementById('filterSelector');
+        filterSel.innerHTML = '<option value="all">Tüm Ders Sayıları</option>';
+        let counts = {};
+        allGeneratedCombos.forEach(c => counts[c.length] = (counts[c.length] || 0) + 1);
+        Object.keys(counts).sort().forEach(n => filterSel.innerHTML += `<option value="${n}">${n} Dersli (${counts[n]})</option>`);
+        
+        let summary = `Toplam ${allGeneratedCombos.length} kombinasyon: `;
+        for (let n in counts) summary += `${n} Dersli: ${counts[n]} | `;
+        document.getElementById('resultCount').innerText = summary;
+        
+        applyFilter();
+        document.getElementById('resultsArea').style.display = 'block';
+    }
+
+    function applyFilter() {
+        const filterVal = document.getElementById('filterSelector').value;
+        const sel = document.getElementById('comboSelector');
+        sel.innerHTML = '';
+        filteredCombos = (filterVal === 'all') ? allGeneratedCombos : allGeneratedCombos.filter(c => c.length == filterVal);
+        filteredCombos.forEach((c, i) => sel.innerHTML += `<option value="${i}">Kombinasyon ${i+1} (${c.length} Ders)</option>`);
+        renderSchedule();
+    }
+
+    function prevCombo() { const sel = document.getElementById('comboSelector'); if (sel.selectedIndex > 0) { sel.selectedIndex--; renderSchedule(); } }
+    function nextCombo() { const sel = document.getElementById('comboSelector'); if (sel.selectedIndex < sel.options.length - 1) { sel.selectedIndex++; renderSchedule(); } }
+
+    function renderSchedule() {
+        const idx = document.getElementById('comboSelector').value;
+        if(filteredCombos.length === 0) return;
+        const combo = filteredCombos[idx];
+        const grid = document.getElementById('scheduleGrid'), list = document.getElementById('sectionList');
+        grid.innerHTML = '<div class="grid-header" style="grid-column:1; grid-row:1;">Saat</div>' + ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma'].map((d,i) => `<div class="grid-header" style="grid-column:${i+2}; grid-row:1;">${d}</div>`).join('');
+        for (let h=8; h<=19; h++) {
+            grid.innerHTML += `<div class="grid-time" style="grid-column:1; grid-row:${h-6};">${h}:00</div>`;
+            for (let d=0; d<5; d++) grid.innerHTML += `<div class="grid-cell" style="grid-column:${d+2}; grid-row:${h-6};"></div>`;
+        }
+        list.innerHTML = '';
+        combo.forEach((item, i) => {
+            list.innerHTML += `<li class="list-group-item"><strong>${item.course}</strong>: Section ${item.section}</li>`;
+            item.blocks.forEach(b => {
+                const start = timeToMin(b.start) - 480, end = timeToMin(b.end) - 480;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'class-block-wrapper';
+                wrapper.style.gridColumn = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma'].indexOf(b.day) + 2;
+                wrapper.style.gridRow = Math.floor(start/60) + 2;
+                const div = document.createElement('div');
+                div.className = 'class-block';
+                div.style.backgroundColor = colors[i % colors.length];
+                div.style.top = `${(start % 60)/60 * 40}px`;
+                div.style.height = `${(end-start)/60 * 40}px`;
+                div.innerHTML = `<strong>${item.course}</strong><br>Sec: ${item.section}`;
+                wrapper.appendChild(div);
+                grid.appendChild(wrapper);
+            });
+        });
+        document.getElementById('prevBtn').disabled = (document.getElementById('comboSelector').selectedIndex === 0);
+        document.getElementById('nextBtn').disabled = (document.getElementById('comboSelector').selectedIndex === filteredCombos.length - 1);
+    }
+    
+    document.getElementById('courseInput').addEventListener('keypress', e => { if (e.key === 'Enter') addCourse(); });
+    window.onload = loadData;
+</script>
+</body>
+</html>
