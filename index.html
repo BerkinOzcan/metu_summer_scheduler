@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     
     <style>
-        body { background-color: #f8f9fa; padding-bottom: 70px; } /* Footer için boşluk */
+        body { background-color: #f8f9fa; padding-bottom: 70px; }
         .course-card { margin-bottom: 15px; border-left: 5px solid #0d6efd; background: white; }
         summary { cursor: pointer; padding: 10px; font-weight: bold; list-style: none; user-select: none; display: flex; align-items: center; }
         summary::after { content: '▾'; margin-left: auto; }
@@ -53,8 +53,13 @@
         <div class="card-body text-center">
             <div class="mb-3">
                 <div class="form-check form-switch d-inline-block me-4">
-                    <input class="form-check-input" type="checkbox" id="conflictToggle" checked onchange="saveData()">
+                    <input class="form-check-input" type="checkbox" id="conflictToggle" checked>
                     <label class="form-check-label" for="conflictToggle">Çakışma Kontrolü</label>
+                </div>
+                <!-- Yeni Eklenen Section Filtresi Toggle'ı -->
+                <div class="form-check form-switch d-inline-block me-4">
+                    <input class="form-check-input" type="checkbox" id="useSectionToggles" checked>
+                    <label class="form-check-label" for="useSectionToggles">Section Filtresini Uygula</label>
                 </div>
             </div>
             <button class="btn btn-success btn-lg mx-2" onclick="generateFromToggle()">Seçili Olanlarla Hesapla</button>
@@ -134,13 +139,20 @@
             const details = document.createElement('details');
             details.className = 'card course-card';
             details.open = true;
+            // Yeni tablo sütunu: Aktif eklendi
             details.innerHTML = `
                 <summary>
                     <input class="form-check-input me-2" type="checkbox" ${data.active ? 'checked' : ''} onchange="toggleCourse('${name}', this.checked)">
                     <input type="text" class="form-control form-control-sm mx-2" style="max-width: 200px;" value="${name}" onblur="renameCourse('${name}', this.value)" onclick="event.stopPropagation()">
                     <button class="btn btn-sm btn-outline-danger ms-auto" onclick="deleteCourse('${name}')">Sil</button>
                 </summary>
-                <div class="card-body"><table class="table table-sm"><thead><tr><th>Sec</th><th>Gün</th><th>Baş</th><th>Bit</th><th></th></tr></thead><tbody id="tbody-${name}"></tbody></table><button class="btn btn-sm btn-secondary" onclick="addRow('${name}')">+ Saat Ekle</button></div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead><tr><th style="width: 50px;" class="text-center">Aktif</th><th>Sec</th><th>Gün</th><th>Baş</th><th>Bit</th><th></th></tr></thead>
+                        <tbody id="tbody-${name}"></tbody>
+                    </table>
+                    <button class="btn btn-sm btn-secondary" onclick="addRow('${name}')">+ Saat Ekle</button>
+                </div>
             `;
             container.appendChild(details);
             data.rows.forEach((row, index) => renderRow(name, row, index));
@@ -151,14 +163,25 @@
 
     function toggleCourse(name, active) { courses[name].active = active; saveData(); }
     function deleteCourse(name) { event.stopPropagation(); delete courses[name]; saveData(); renderCourses(); }
-    function addRow(name) { courses[name].rows.push({ section: '1', day: 'Pazartesi', start: '08:40', end: '10:30' }); saveData(); renderCourses(); }
+    function addRow(name) { courses[name].rows.push({ section: '1', day: 'Pazartesi', start: '08:40', end: '10:30', active: true }); saveData(); renderCourses(); }
     function removeRow(name, idx) { courses[name].rows.splice(idx, 1); saveData(); renderCourses(); }
     function updateRow(name, idx, field, val) { courses[name].rows[idx][field] = val; saveData(); }
+
+    // Yeni Eklenen Fonksiyon: Aynı section numarasına sahip tüm satırların aktiflik durumunu senkronize eder
+    function updateSectionActive(courseName, sectionNum, isActive) {
+        courses[courseName].rows.forEach(r => {
+            if (r.section === sectionNum) r.active = isActive;
+        });
+        saveData();
+        renderCourses();
+    }
 
     function renderRow(name, row, idx) {
         const tbody = document.getElementById(`tbody-${name}`);
         const tr = document.createElement('tr');
+        const isActive = row.active !== false; // Eski veriler için varsayılan true
         tr.innerHTML = `
+            <td class="text-center align-middle"><input class="form-check-input" type="checkbox" ${isActive ? 'checked' : ''} onchange="updateSectionActive('${name}', '${row.section}', this.checked)"></td>
             <td><input type="text" class="form-control form-control-sm" value="${row.section}" onchange="updateRow('${name}', ${idx}, 'section', this.value)"></td>
             <td><select class="form-select form-select-sm" onchange="updateRow('${name}', ${idx}, 'day', this.value)">${['Pazartesi','Salı','Çarşamba','Perşembe','Cuma'].map(d=>`<option ${row.day==d?'selected':''}>${d}</option>`).join('')}</select></td>
             <td><input type="text" class="form-control form-control-sm time-picker bg-white" value="${row.start}" onchange="updateRow('${name}', ${idx}, 'start', this.value)"></td>
@@ -172,10 +195,19 @@
 
     function calculate(courseList) {
         const checkConflicts = document.getElementById('conflictToggle').checked;
+        const useSections = document.getElementById('useSectionToggles').checked; // Toggle kontrolü eklendi
+        
         let courseSections = {};
         for (let c of courseList) {
             let rows = courses[c].rows.filter(r => r.section && r.start && r.end);
-            if (rows.length === 0) return [];
+            
+            // Eğer "Section Filtresini Uygula" açıksa, inaktif sectionları hesaba katma
+            if (useSections) {
+                rows = rows.filter(r => r.active !== false);
+            }
+            
+            if (rows.length === 0) return []; // Eğer dersin seçili hiç sectionı yoksa bu kombinasyonu çöpe at
+            
             let sections = {};
             rows.forEach(r => { if(!sections[r.section]) sections[r.section] = []; sections[r.section].push(r); });
             courseSections[c] = sections;
@@ -204,6 +236,7 @@
     }
 
     function generateFromToggle() { const active = Object.keys(courses).filter(c => courses[c].active); allGeneratedCombos = calculate(active); updateUI(); }
+    
     function generateAllSubsets() {
         const allCourseNames = Object.keys(courses);
         const subsets = allCourseNames.reduce((subsets, value) => subsets.concat(subsets.map(set => [value, ...set])), [[]]).filter(s => s.length > 0);
